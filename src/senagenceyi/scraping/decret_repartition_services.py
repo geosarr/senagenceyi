@@ -24,7 +24,7 @@ def clean(text: str) -> str:
 	)
 
 
-def main(out_folder: str = "") -> str:
+def fetch_decree(out_folder: str = "") -> pd.DataFrame:
 	try:
 		soup = fetch(URL)
 	except Exception as e:
@@ -44,10 +44,9 @@ def main(out_folder: str = "") -> str:
 	path = os.path.join(out_folder, "decret_repartition_services_raw.xlsx")
 	if os.path.exists(path):
 		path = path.replace(".xlsx", "_new.xlsx")
-	pd.DataFrame({"decret_repartition_services": extracted_text}).to_excel(
-		path, index=False
-	)
-	return "\n".join(extracted_text)
+	result = pd.DataFrame({"decret_repartition_services": extracted_text})
+	result.to_excel(path, index=False)
+	return result
 
 
 def service_contains(df: pd.DataFrame, text: str) -> pd.Series:
@@ -80,6 +79,13 @@ def impute_admin(services: pd.DataFrame) -> pd.DataFrame:
 	services.loc[admin_mask, "administration"] = services[admin_mask].service
 	services.loc[:, "administration"] = services.administration.ffill()
 	services = services.loc[~admin_mask].reset_index(drop=True)
+
+	def row_after_article_2(df: pd.DataFrame) -> pd.Series:
+		return df.index > df[df.service.str.strip().str.startswith("Article 2")].index[0]
+
+	services.loc[row_after_article_2, "administration"] = services.loc[
+		row_after_article_2, "entite"
+	]
 	return services
 
 
@@ -105,11 +111,14 @@ def clean_raw_service_data(state_services: pd.DataFrame) -> pd.DataFrame:
 	)
 
 
-if __name__ == "__main__":
-	# result = main("data")
-	# print(result)
-	state_services = pd.read_excel("data/decret_repartition_services_raw.xlsx").pipe(
-		clean_raw_service_data
+def main(out_folder: str = "") -> pd.DataFrame:
+	decree = fetch_decree(out_folder).pipe(clean_raw_service_data)
+	decree.to_excel(
+		os.path.join(out_folder, "decret_repartition_services_structured.xlsx"),
+		index=False,
 	)
-	print(state_services)
-	state_services.to_excel("decret_repartition_services_structured.xlsx", index=False)
+	return decree
+
+
+if __name__ == "__main__":
+	main("data")
