@@ -108,6 +108,7 @@ def clean_raw_service_data(state_services: pd.DataFrame) -> pd.DataFrame:
 			service=lambda df: df.service.str.strip(),
 		)
 		.reset_index(drop=True)
+		.assign(lien_source=URL)
 	)
 
 
