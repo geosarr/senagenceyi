@@ -95,7 +95,7 @@ async def scrape_page(url):
 		return await asyncio.gather(*tasks)
 
 
-def scrap_page_sync(url):
+def scrape_page_sync(url):
 	print(f"Scraping page: {url}")
 	html = fetch_sync(url)
 	soup = BeautifulSoup(html, "html.parser")
@@ -126,7 +126,7 @@ def main_sync(out_folder: str = ""):
 	records = []
 	try:
 		for page in track(range(1, 50), description="Scraping pages..."):
-			records.extend(scrap_page_sync(f"{BASE_URL}?p={page}"))
+			records.extend(scrape_page_sync(f"{BASE_URL}?p={page}"))
 	except Exception as e:
 		print(f"Error during scraping: {e}")
 	result = pd.DataFrame(records).dropna(subset=["nom"]).assign(lien_source=BASE_URL)
