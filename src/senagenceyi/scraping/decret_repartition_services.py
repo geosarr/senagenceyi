@@ -115,7 +115,7 @@ def clean_raw_service_data(state_services: pd.DataFrame) -> pd.DataFrame:
 def main(out_folder: str = "") -> pd.DataFrame:
 	decree = fetch_decree(out_folder).pipe(clean_raw_service_data)
 	decree.to_excel(
-		os.path.join(out_folder, "decret_repartition_services_structured.xlsx"),
+		os.path.join(out_folder, "decret_repartition_services.xlsx"),
 		index=False,
 	)
 	return decree
