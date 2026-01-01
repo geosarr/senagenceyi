@@ -2,10 +2,17 @@ from concurrent.futures import ProcessPoolExecutor
 from itertools import chain
 from multiprocessing import Manager
 from time import sleep
+from typing import Callable
 
 import pandas as pd
 from ddgs import DDGS
-from rich.progress import BarColumn, Progress, TimeElapsedColumn, TimeRemainingColumn
+from rich.progress import (
+	BarColumn,
+	Progress,
+	TaskID,
+	TimeElapsedColumn,
+	TimeRemainingColumn,
+)
 
 
 def process_result(results):
@@ -57,16 +64,7 @@ def progress_bar():
 	)
 
 
-if __name__ == "__main__":
-	n_workers = 8  # set this to the number of cores you have on your machine
-
-	df = pd.read_excel("data/decret_repartition_services.xlsx")
-	services_and_contexts = df[["service", "administration"]].drop_duplicates()
-	services = services_and_contexts["service"].tolist()
-	contexts = services_and_contexts["administration"].tolist()
-	splitted_services = split(services, n_workers)
-	splitted_contexts = split(contexts, n_workers)
-	# Adapted from https://www.deanmontgomery.com/2022/03/24/rich-progress-and-multiprocessing/
+def search_engine(engine: Callable[[dict, TaskID], list], n_workers: int, args: list):
 	with (
 		progress_bar() as progress,
 		Manager() as manager,
@@ -80,15 +78,7 @@ if __name__ == "__main__":
 		for n in range(0, n_workers):  # iterate over the jobs we need to run
 			# set visible false so we don't have a lot of bars all at once:
 			task_id = progress.add_task(f"task {n}", visible=False)
-			futures.append(
-				executor.submit(
-					fetch_some_services,
-					_progress,
-					task_id,
-					splitted_services[n],
-					splitted_contexts[n],
-				)
-			)
+			futures.append(executor.submit(engine, _progress, task_id, *(args[n])))
 
 		# monitor the progress:
 		while (n_finished := sum([future.done() for future in futures])) <= len(futures):
@@ -107,6 +97,22 @@ if __name__ == "__main__":
 				)
 			if n_finished == len(futures):
 				break
+	return futures
 
-		links = chain.from_iterable([future.result() for future in futures])
-		pd.DataFrame(links).to_excel("data/services_sites_officiels.xlsx", index=False)
+
+if __name__ == "__main__":
+	n_workers = 8  # set this to the number of cores you have on your machine
+
+	df = pd.read_excel("data/decret_repartition_services.xlsx").head(20)
+	services_and_contexts = df[["service", "administration"]].drop_duplicates()
+	services = services_and_contexts["service"].tolist()
+	contexts = services_and_contexts["administration"].tolist()
+	splitted_services = split(services, n_workers)
+	splitted_contexts = split(contexts, n_workers)
+	# Adapted from https://www.deanmontgomery.com/2022/03/24/rich-progress-and-multiprocessing/
+
+	futures = search_engine(
+		fetch_some_services, n_workers, list(zip(splitted_services, splitted_contexts))
+	)
+	links = chain.from_iterable([future.result() for future in futures])
+	pd.DataFrame(links).to_excel("data/services_sites_officiels_bis.xlsx", index=False)
