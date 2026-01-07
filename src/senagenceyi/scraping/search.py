@@ -2,7 +2,7 @@ from concurrent.futures import ProcessPoolExecutor
 from itertools import chain
 from multiprocessing import Manager
 from time import sleep
-from typing import Callable
+from typing import Callable, Union
 
 import pandas as pd
 from ddgs import DDGS
@@ -64,7 +64,9 @@ def progress_bar():
 	)
 
 
-def search_engine(engine: Callable[[dict, TaskID], list], n_workers: int, args: list):
+def parallel_computation(
+	function: Callable[[dict, TaskID], Union[list, dict]], n_workers: int, args: list
+):
 	with (
 		progress_bar() as progress,
 		Manager() as manager,
@@ -78,7 +80,7 @@ def search_engine(engine: Callable[[dict, TaskID], list], n_workers: int, args: 
 		for n in range(0, n_workers):  # iterate over the jobs we need to run
 			# set visible false so we don't have a lot of bars all at once:
 			task_id = progress.add_task(f"task {n}", visible=False)
-			futures.append(executor.submit(engine, _progress, task_id, *(args[n])))
+			futures.append(executor.submit(function, _progress, task_id, *(args[n])))
 
 		# monitor the progress:
 		while (n_finished := sum([future.done() for future in futures])) <= len(futures):
@@ -111,7 +113,7 @@ if __name__ == "__main__":
 	splitted_contexts = split(contexts, n_workers)
 	# Adapted from https://www.deanmontgomery.com/2022/03/24/rich-progress-and-multiprocessing/
 
-	futures = search_engine(
+	futures = parallel_computation(
 		fetch_some_services, n_workers, list(zip(splitted_services, splitted_contexts))
 	)
 	links = chain.from_iterable([future.result() for future in futures])

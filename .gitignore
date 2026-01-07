@@ -1,2 +1,5 @@
 .env
 decret_repartition_services_raw*
+__pycache__
+code.py
+extract.py
